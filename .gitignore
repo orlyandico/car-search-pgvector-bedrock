@@ -22,3 +22,5 @@ terraform/car-search-loader.pem
 tofu/car-search-loader.pem
 *.pem
 training/output.md
+training/OUT.md
+
