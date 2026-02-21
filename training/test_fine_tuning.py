@@ -17,7 +17,7 @@ def load_prompt():
 # Update these with your model IDs
 GLM_MODEL = 'zai.glm-4.7'
 NOVA_BASE_MODEL = 'us.amazon.nova-micro-v1:0'
-NOVA_FINETUNED_ARN = 'arn:aws:bedrock:us-east-1:010928215215:custom-model-deployment/YOUR_DEPLOYMENT_NAME'
+NOVA_FINETUNED_ARN = 'arn:aws:bedrock:us-east-1:010928215215:custom-model-deployment/zsha45yuu40e'
 
 def generate_queries(client):
     response = client.invoke_model(

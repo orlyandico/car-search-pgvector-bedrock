@@ -310,14 +310,17 @@ aws bedrock get-model-customization-job --region us-east-1 --job-identifier filt
 
 Replace `TIMESTAMP` with the value from the script output. Fine-tuning takes 2-4 hours.
 
-**4. Create on-demand deployment**:
+**4. Create custom model deployment**:
 
-After the fine-tuning job completes (status: `Completed`), create an on-demand deployment (requires AWS CLI 2.33+):
+After the fine-tuning job completes (status: `Completed`), you must create a custom model deployment for serverless on-demand inference. Fine-tuned models cannot be invoked directly - they require either a custom model deployment (serverless) or provisioned throughput (reserved capacity).
+
+**Important**: Custom model deployments are required for on-demand inference on fine-tuned models. Without this step, you'll receive a `ValidationException` stating "Custom model inference is no longer supported directly."
+
+**Important**: Custom model deployments are required for on-demand inference on fine-tuned models. Without this step, you'll receive a `ValidationException` stating "Custom model inference is no longer supported directly."
+
+After the fine-tuning job completes (status: `Completed`), create a custom model deployment:
 
 ```bash
-# Check CLI version
-aws --version  # Must be 2.33.0 or higher
-
 # Get the custom model ARN from the job output
 MODEL_ARN=$(aws bedrock get-model-customization-job \
   --region us-east-1 \
@@ -325,31 +328,33 @@ MODEL_ARN=$(aws bedrock get-model-customization-job \
   --query 'outputModelArn' \
   --output text)
 
-# Create deployment
+# Create custom model deployment (serverless on-demand)
 aws bedrock create-custom-model-deployment \
   --region us-east-1 \
-  --model-deployment-name filter-extraction-nova \
+  --model-deployment-name filter-extraction-nova-deployment \
   --model-arn $MODEL_ARN
 
-# Get deployment ARN (wait ~1 minute for deployment to become Active)
+# Check deployment status (takes ~2 minutes to become Active)
 aws bedrock list-custom-model-deployments \
   --region us-east-1 \
-  --query 'customModelDeployments[?modelArn==`'$MODEL_ARN'`].customModelDeploymentArn' \
-  --output text
+  --query 'modelDeploymentSummaries[?modelArn==`'$MODEL_ARN'`].[customModelDeploymentArn,status]' \
+  --output table
 ```
 
-Save the deployment ARN - you'll need it for inference.
+Wait for status to change from `Creating` to `Active` before proceeding. The deployment ARN will be used for inference.
 
 **5. Test fine-tuned model**:
 
-After the deployment is active, test the model against the GLM-4.7 baseline:
+After the deployment status is `Active`, test the model against the GLM-4.7 baseline:
 
 ```bash
 cd training
 
 # Update NOVA_FINETUNED_ARN in test_fine_tuning.py with your deployment ARN, or:
-python3 test_fine_tuning.py --finetuned-arn arn:aws:bedrock:us-east-1:ACCOUNT:custom-model-deployment/NAME --output test_results.csv
+python3 test_fine_tuning.py --finetuned-arn arn:aws:bedrock:us-east-1:ACCOUNT:custom-model-deployment/DEPLOYMENT_ID --output test_results.csv
 ```
+
+**Note**: Use the custom model deployment ARN (format: `arn:aws:bedrock:REGION:ACCOUNT:custom-model-deployment/ID`), not the custom model ARN. The deployment ARN is returned by `create-custom-model-deployment` and listed by `list-custom-model-deployments`.
 
 This script:
 - Generates 20 diverse synthetic queries using GLM-4.7
@@ -408,12 +413,14 @@ After validating the fine-tuned model's quality, update the Flask application to
 
 ```bash
 # Set environment variable with deployment ARN
-export FILTER_MODEL_ID="arn:aws:bedrock:us-east-1:ACCOUNT:custom-model-deployment/filter-extraction-nova"
+export FILTER_MODEL_ID="arn:aws:bedrock:us-east-1:ACCOUNT:custom-model-deployment/DEPLOYMENT_ID"
 
 # Restart application
 cd app
 python3 app.py
 ```
+
+**Important**: Use the custom model deployment ARN, not the custom model ARN. The deployment ARN has the format `arn:aws:bedrock:REGION:ACCOUNT:custom-model-deployment/ID`.
 
 The application automatically uses the model specified in `FILTER_MODEL_ID` environment variable. The `llm_utils.py` module already supports custom model deployments via the Converse API.
 
@@ -422,14 +429,17 @@ The application automatically uses the model specified in `FILTER_MODEL_ID` envi
 You can also set the default model in `app/filter_prompt.txt`:
 
 ```
-# Model: arn:aws:bedrock:us-east-1:ACCOUNT:custom-model-deployment/filter-extraction-nova
+# Model: arn:aws:bedrock:us-east-1:ACCOUNT:custom-model-deployment/DEPLOYMENT_ID
 
 Extract structured filters from this car search query...
 ```
 
 This makes the fine-tuned model the default without requiring environment variables.
 
-**Important**: Ensure your application's Bedrock client uses `region_name='us-east-1'` to match the deployment region.
+**Important**: 
+- Use the custom model deployment ARN (not the custom model ARN)
+- Ensure your application's Bedrock client uses `region_name='us-east-1'` to match the deployment region
+- Custom model deployments are region-specific and can only be invoked from the region where they were created
 
 **7. Monitor and iterate**:
 
