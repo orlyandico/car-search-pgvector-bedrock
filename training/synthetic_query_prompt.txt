@@ -1,0 +1,29 @@
+Generate 20 diverse natural language car search queries that users might ask when searching a used car database.
+
+The database contains these filterable fields:
+- price (integer, $0-$250,000)
+- year (integer, 1990-2030)
+- odometer (integer, 0-300,000 miles)
+- manufacturer (toyota, ford, chevrolet, honda, nissan, bmw, mercedes-benz, audi, volkswagen, porsche, etc.)
+- type (sedan, suv, truck, coupe, hatchback, wagon, van, convertible)
+- fuel (gas, diesel, electric, hybrid, other)
+- transmission (automatic, manual, other)
+- drive (fwd, rwd, 4wd)
+- condition (excellent, like new, good, fair)
+- paint_color (black, white, silver, grey, blue, red, green, brown, orange, yellow)
+- cylinders (3, 4, 5, 6, 8, 10, 12 cylinders)
+- title_status (clean, rebuilt, salvage, missing, parts only, lien)
+- size (compact, mid-size, full-size, sub-compact)
+- state (two-letter US state codes)
+
+Generate queries that:
+1. Mix structured filters (price, year, manufacturer) with unstructured features (sunroof, leather, reliable)
+2. Use natural conversational language ("I need", "looking for", "want", or just direct descriptions)
+3. Vary complexity (simple: "cheap honda", complex: "german diesel automatic suv under $20k with low miles")
+4. Include regional terms ("german" = BMW/Mercedes/Audi, "japanese" = Toyota/Honda/Nissan, "american" = Ford/Chevy/Dodge)
+5. Mix price formats ($5k, $5000, "under 10k", "between 15 and 20 thousand")
+6. Include common features (sunroof, leather seats, backup camera, third row, tow package, heated seats)
+7. Include condition/quality terms (reliable, fuel efficient, low miles, well maintained, clean title)
+8. Vary specificity (specific model vs general type)
+
+Return ONLY a JSON array of 20 query strings, no other text.

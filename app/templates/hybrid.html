@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hybrid Semantic Search - Car Search</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        #chatForm {
+            display: flex;
+            gap: 12px;
+            margin: 0 auto 30px;
+            max-width: 900px;
+        }
+        
+        #queryInput {
+            flex: 1;
+            padding: 16px;
+            border: 2px solid #d0d0d0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+        }
+        
+        #queryInput:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+        
+        #chatForm .button {
+            height: 52px;
+            padding: 0 32px;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚗 Hybrid Semantic Search</h1>
+            <a href="/" class="back-link">← Back to Home</a>
+        </div>
+        
+        <div class="search-section">
+            <form id="chatForm">
+                <input type="text" id="queryInput" placeholder="Try: German automatic convertible between $5k and $7k">
+                <button type="submit" class="button">Search</button>
+            </form>
+            
+            <div id="results"></div>
+        </div>
+    </div>
+    
+    <script src="/static/js/results.js"></script>
+    <script src="/static/js/hybrid.js"></script>
+</body>
+</html>

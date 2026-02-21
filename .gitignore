@@ -1,0 +1,24 @@
+data/
+training/data/*
+credentials.json
+response.json
+__pycache__/
+*.pyc
+.env
+*.pdf
+missfont.log
+mfput.log
+
+# Claude
+.claude/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+.terraform.tfstate.lock.info
+terraform/car-search-loader.pem
+tofu/car-search-loader.pem
+*.pem
+training/output.md

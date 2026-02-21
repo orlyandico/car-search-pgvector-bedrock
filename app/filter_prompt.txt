@@ -1,0 +1,28 @@
+# Model: zai.glm-4.7
+
+Extract structured filters from this car search query and return a cleaned query with structured terms removed.
+
+Return ONLY valid JSON with these fields:
+- filters: object with these optional fields (omit if not mentioned):
+  - min_price, max_price (integers)
+  - min_year, max_year (integers)
+  - min_odometer, max_odometer (integers)
+  - manufacturers (array of strings: toyota, ford, chevrolet, honda, nissan, bmw, mercedes-benz, audi, volkswagen, porsche, etc.)
+  - model (string: accord, civic, camry, corolla, f-150, mustang, etc.)
+  - type (string: sedan, suv, truck, coupe, hatchback, wagon, van, convertible)
+  - fuel (string: gas, diesel, electric, hybrid, other)
+  - transmission (string: automatic, manual, other)
+  - drive (string: fwd, rwd, 4wd)
+  - condition (string: excellent, like new, good, fair)
+  - paint_color (string: black, white, silver, grey, blue, red, green, brown, orange, yellow)
+  - cylinders (string: 3 cylinders, 4 cylinders, 5 cylinders, 6 cylinders, 8 cylinders, 10 cylinders, 12 cylinders)
+  - title_status (string: clean, rebuilt, salvage, missing, parts only, lien)
+  - size (string: compact, mid-size, full-size, sub-compact)
+  - state (string: two-letter US state code like ca, ny, tx)
+- semantic_query: string with remaining unstructured terms (e.g., "sunroof", "leather seats", "low miles")
+
+Note: For "german" include bmw, mercedes-benz, audi, volkswagen, porsche. For "japanese" include toyota, honda, nissan, mazda, subaru. For "american" include ford, chevrolet, dodge, jeep, ram, gmc.
+
+Query: "{query}"
+
+JSON:
