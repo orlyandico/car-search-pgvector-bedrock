@@ -4,7 +4,7 @@
 
 ![Car Search Screenshot](car_search.png)
 
-Please refer to the code repository [here](https://github.com/orlyandico/car-search) for the most up-to-date version of this document.
+Please refer to the code repository [here](https://github.com/orlyandico/car-search-pgvector-bedrock) for the most up-to-date version of this document.
 
 This repository shows how to add AI capabilities to existing PostgreSQL applications without rebuilding infrastructure. Many businesses run systems of record on PostgreSQL with traditional search. This demonstrates adding semantic search and LLM-powered query understanding whilst preserving existing infrastructure, data models, and application code.
 
