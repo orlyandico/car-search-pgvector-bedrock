@@ -281,7 +281,8 @@ INSERT/UPDATE on car_listings
    - Does NOT delete IDs from queue (Lambda handles deletion after success)
 
 5. **Lambda processes batch**:
-   - Queries `car_listings` for the batch of IDs (up to 96)
+   - Receives listing IDs from pg_cron (up to 96 per invocation)
+   - Queries `car_listings` to fetch full data for those IDs
    - Concatenates fields into text for each listing
    - Calls Bedrock Cohere Embed v4 once with all texts (90% cost reduction vs individual calls)
    - Receives embeddings (1024 dimensions each)
