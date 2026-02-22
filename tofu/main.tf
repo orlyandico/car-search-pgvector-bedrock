@@ -446,7 +446,7 @@ resource "aws_lambda_function" "embeddings" {
   role          = aws_iam_role.lambda.arn
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.12"
-  timeout       = 900
+  timeout       = 15
   memory_size   = 512
 
   filename         = "${path.module}/lambda_placeholder.zip"

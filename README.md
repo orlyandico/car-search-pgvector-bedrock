@@ -278,7 +278,7 @@ INSERT/UPDATE on car_listings
    - Calculates batches needed (queue_depth / 96, rounded up)
    - Caps at 10 batches per run (max 960 IDs/minute)
    - Fires parallel Lambda invocations, each with 96 IDs
-   - Deletes processed IDs from queue immediately (even though Lambdas still processing)
+   - Does NOT delete IDs from queue (Lambda handles deletion after success)
 
 5. **Lambda processes batch**:
    - Queries `car_listings` for the batch of IDs (up to 96)
@@ -286,13 +286,15 @@ INSERT/UPDATE on car_listings
    - Calls Bedrock Cohere Embed v4 once with all texts (90% cost reduction vs individual calls)
    - Receives embeddings (1024 dimensions each)
    - Upserts to `car_embeddings` with `ON CONFLICT` to update existing embeddings
+   - Deletes successfully processed IDs from `embedding_queue`
 
 **Timeline example:**
 - `10:00:00.000` - User updates listing 12345
 - `10:00:00.001` - Trigger queues ID, transaction commits
 - `10:01:00.000` - pg_cron checks queue (200 IDs), fires 3 parallel Lambdas with batches [96, 96, 8 IDs]
-- `10:01:00.050` - Queue cleared, function returns
-- `10:01:05.000` - Lambdas finish, embeddings updated
+- `10:01:00.050` - Function returns (queue still contains 200 IDs)
+- `10:01:12.000` - Lambdas finish (within 15s timeout), embeddings updated, queue cleared by Lambda
+- `10:02:00.000` - pg_cron runs again, queue empty (or processes remaining IDs if any Lambda timed out)
 
 **Key characteristics:**
 - **Asynchronous**: User transactions complete in <1ms
@@ -300,7 +302,7 @@ INSERT/UPDATE on car_listings
 - **Parallel processing**: Multiple Lambdas invoked simultaneously when queue is large
 - **Idempotent**: Multiple updates to same listing = single queue entry
 - **Eventually consistent**: Embeddings update within 1-2 minutes
-- **Resilient**: Queue persists across failures, pg_cron retries every minute
+- **Resilient**: Failed Lambda invocations automatically retry (queue entries persist until Lambda deletes them after success)
 - **Cost-controlled**: Capped at 10 batches (960 IDs) per minute to prevent runaway Lambda costs
 
 ### Setup
@@ -343,39 +345,30 @@ The job will:
 
 ### Limitations and trade-offs
 
-**Potential for lost embedding updates:**
+**Resilient queue processing:**
 
-The system uses asynchronous Lambda invocation (`'Event'` type) to avoid blocking the pg_cron job. This means:
+The system uses asynchronous Lambda invocation (`'Event'` type) to avoid blocking the pg_cron job, combined with Lambda-side queue deletion for resilience:
 
-1. Lambda is invoked and the queue is cleared immediately (fire-and-forget)
-2. If Lambda fails after the queue is cleared, those embedding updates are lost
-3. Most common failure: Bedrock throttling that exceeds boto3's exponential backoff retry limit (>40 seconds)
+1. pg_cron invokes Lambda asynchronously (fire-and-forget)
+2. Lambda processes embeddings and only deletes IDs from queue after successful upsert
+3. If Lambda fails, IDs remain in queue for retry on next pg_cron run (1 minute later)
+4. Most common failure: Bedrock throttling that exceeds boto3's exponential backoff retry limit
 
-**Mitigation strategies:**
+**Benefits of Lambda-side deletion:**
 
+- **Automatic retry**: Failed batches remain in queue for next pg_cron run
+- **No data loss**: Only successfully processed embeddings are removed from queue
+- **Idempotent**: Upsert handles duplicate processing if Lambda succeeds but deletion fails
+- **Simple recovery**: No manual intervention needed for transient failures
+
+**Configuration for preventing duplicate processing:**
+
+- **Lambda timeout**: 15 seconds (completes before next pg_cron run at 60 seconds)
+- **Bedrock retries**: Max 2 attempts (1 initial + 1 retry) with exponential backoff
 - **Cohere global endpoint**: Uses `global.cohere.embed-v4:0` for higher throughput and cross-region load balancing
-- **boto3 automatic retries**: Built-in exponential backoff handles transient throttles (default: 3 attempts)
-- **Increase retry attempts**: Configure boto3 with higher `max_attempts` (e.g., 10) in Lambda to reduce throttle failures at the cost of longer execution time
-- **Proper capacity planning**: AWS infrastructure should be sized to avoid throttles under normal load
 - **Monitoring**: Track Lambda failures via CloudWatch to detect systematic throttling issues
 
-**Expected failure rate:** During initial bulk embedding generation of 422K listings, approximately 3,000 rows (~0.7%) failed due to Bedrock throttling despite exponential backoff. For incremental updates with lower throughput, the failure rate should be significantly lower. Increasing boto3 retry attempts in the Lambda function can further reduce this failure rate.
-
-**Recovery options if embeddings are lost:**
-
-```bash
-# Find listings without embeddings
-python3 scripts/psql.py
-# Then in psql:
-\c car_search
-SELECT id FROM car_listings 
-WHERE id NOT IN (SELECT listing_id FROM car_embeddings);
-
-# Regenerate embeddings for specific range
-python3 scripts/generate_embeddings.py --start-id X --end-id Y
-```
-
-**Alternative design (not implemented):** Synchronous Lambda invocation would guarantee no data loss but would block the pg_cron job for 5-10 seconds per batch (or >40 seconds on Bedrock failures), which is unacceptable for a job running every minute. The current async design prioritises system responsiveness over guaranteed delivery.
+**Expected behaviour:** Lambda completes within 15 seconds (success or timeout). Failed invocations leave IDs in queue for automatic retry on next pg_cron run (1 minute later). Maximum 4 concurrent Lambda invocations possible during normal operation.
 
 ### Benefits
 
@@ -386,9 +379,9 @@ python3 scripts/generate_embeddings.py --start-id X --end-id Y
 - **Automatic**: No manual embedding regeneration needed
 - **Selective**: Only triggers on fields that affect embeddings
 - **Idempotent**: Duplicate updates to same listing = single queue entry
-- **Resilient**: Queue persists across failures
+- **Resilient**: Failed Lambda invocations automatically retry (Lambda deletes from queue only after success)
 - **Cost-controlled**: Capped at 10 batches per minute
-- **No Lambda changes**: Uses existing Lambda function as-is
+- **No data loss**: Queue entries persist until successfully processed
 
 ### Monitoring
 
@@ -699,7 +692,7 @@ Updates Lambda function with actual code:
 - Calls Bedrock Cohere Embed v4 via VPC endpoint (global endpoint, 1024 dimensions)
 - Upserts embeddings to `car_embeddings` table
 - Updates existing embeddings if fields changed
-- 15 minute timeout, 512 MB memory
+- 15 second timeout, 512 MB memory, max 2 Bedrock API attempts (1 retry)
 
 **Network architecture:**
 - Lambda in private subnets (same as Aurora)

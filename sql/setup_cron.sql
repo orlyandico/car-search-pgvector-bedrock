@@ -40,8 +40,6 @@ BEGIN
             json_build_object('listing_ids', batch_ids)::json,
             'Event'
         );
-        
-        DELETE FROM embedding_queue WHERE listing_id = ANY(batch_ids);
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;

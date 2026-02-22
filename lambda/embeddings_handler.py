@@ -1,6 +1,7 @@
 import json
 import psycopg2
 import boto3
+from botocore.config import Config
 import os
 
 def get_db_connection():
@@ -87,9 +88,12 @@ def lambda_handler(event, context):
     texts = [compose_embedding_text(l) for l in listings]
     print(f"Composed {len(texts)} embedding texts")
     
-    # Call Bedrock
+    # Call Bedrock with limited retries
     print(f"Calling Bedrock for embeddings...")
-    bedrock = boto3.client('bedrock-runtime')
+    bedrock_config = Config(
+        retries={'max_attempts': 2, 'mode': 'standard'}
+    )
+    bedrock = boto3.client('bedrock-runtime', config=bedrock_config)
     response = bedrock.invoke_model(
         modelId='global.cohere.embed-v4:0',
         contentType='application/json',
@@ -108,6 +112,7 @@ def lambda_handler(event, context):
     
     # Upsert embeddings
     print(f"Upserting embeddings to database...")
+    processed_ids = []
     for listing, text, embedding in zip(listings, texts, embeddings):
         cur.execute("""
             INSERT INTO car_embeddings (listing_id, embedding_text, embedding)
@@ -117,6 +122,11 @@ def lambda_handler(event, context):
                 embedding = EXCLUDED.embedding,
                 created_at = NOW()
         """, (listing['id'], text, embedding))
+        processed_ids.append(listing['id'])
+    
+    # Clear successfully processed IDs from queue
+    print(f"Clearing {len(processed_ids)} IDs from embedding_queue...")
+    cur.execute("DELETE FROM embedding_queue WHERE listing_id = ANY(%s)", (processed_ids,))
     
     conn.commit()
     cur.close()
