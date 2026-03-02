@@ -91,6 +91,8 @@ Shows:
 terraform destroy
 ```
 
+**Note**: Secrets Manager has a 30-day recovery window by default. This configuration uses `name_prefix` for the database credentials secret to avoid conflicts on repeated deployments. The `recovery_window_in_days = 0` setting forces immediate deletion on destroy.
+
 ## Cost Estimate
 
 4-hour demo:

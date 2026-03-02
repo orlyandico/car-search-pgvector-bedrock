@@ -116,6 +116,7 @@ def main():
         print("Error: Update NOVA_FINETUNED_ARN in script or use --finetuned-arn")
         sys.exit(1)
     
+    # Fine-tuned models are deployed in us-east-1
     client = boto3.client('bedrock-runtime', region_name='us-east-1')
     
     print("Generating 20 synthetic queries...")

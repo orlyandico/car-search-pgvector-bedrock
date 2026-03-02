@@ -1,6 +1,14 @@
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+}
+
 function displayError(message) {
     const container = document.getElementById('results');
-    container.innerHTML = `<div class="empty-state">${message}</div>`;
+    // nosemgrep: insecure-innerhtml, insecure-document-method
+    container.innerHTML = `<div class="empty-state">${escapeHtml(message)}</div>`;
 }
 
 function displayResults(results, elapsed) {
@@ -11,12 +19,12 @@ function displayResults(results, elapsed) {
         return;
     }
     
-    const header = `<div class="results-header" style="display:block;"><span>${results.length} car${results.length !== 1 ? 's' : ''} found in ${elapsed}ms</span></div>`;
+    const header = `<div class="results-header" style="display:block;"><span>${escapeHtml(results.length)} car${results.length !== 1 ? 's' : ''} found in ${escapeHtml(elapsed)}ms</span></div>`;
     
     const cards = results.map(car => {
-        const title = [car.year, car.manufacturer, car.model].filter(Boolean).join(' ');
-        const price = car.price ? `$${car.price.toLocaleString()}` : 'Price not listed';
-        const similarity = car.similarity ? `${(car.similarity * 100).toFixed(1)}%` : '';
+        const title = escapeHtml([car.year, car.manufacturer, car.model].filter(Boolean).join(' '));
+        const price = car.price ? `$${escapeHtml(car.price.toLocaleString())}` : 'Price not listed';
+        const similarity = car.similarity ? `${escapeHtml((car.similarity * 100).toFixed(1))}%` : '';
         
         const imageMap = {
             'sedan': 'img_sedan.jpeg',
@@ -28,33 +36,35 @@ function displayResults(results, elapsed) {
             'van': 'img_van.jpeg',
             'convertible': 'img_convertible.jpeg'
         };
-        const imageSrc = car.type && imageMap[car.type.toLowerCase()] 
-            ? `/static/images/${imageMap[car.type.toLowerCase()]}` 
+        const typeKey = car.type ? car.type.toLowerCase() : '';
+        const imageSrc = imageMap[typeKey] 
+            ? `/static/images/${imageMap[typeKey]}` 
             : '/static/images/img_sedan.jpeg';
         
         const badges = [];
         if (similarity) {
-            badges.push(`<span class="badge">Match: ${similarity}</span>`);
+            badges.push(`<span class="badge">Match: ${escapeHtml(similarity)}</span>`);
         }
         if (car.condition) {
             const conditionClass = car.condition === 'excellent' || car.condition === 'like new' ? 'condition-excellent' : 
                                    car.condition === 'good' ? 'condition-good' : '';
-            badges.push(`<span class="badge ${conditionClass}">${car.condition.toUpperCase()}</span>`);
+            badges.push(`<span class="badge ${escapeHtml(conditionClass)}">${escapeHtml(car.condition).toUpperCase()}</span>`);
         }
         
         const details = [];
-        if (car.odometer) details.push(`<div class="detail"><strong>Mileage:</strong> ${car.odometer.toLocaleString()} miles</div>`);
-        if (car.transmission) details.push(`<div class="detail"><strong>Transmission:</strong> ${car.transmission}</div>`);
-        if (car.fuel) details.push(`<div class="detail"><strong>Fuel:</strong> ${car.fuel}</div>`);
-        if (car.type) details.push(`<div class="detail"><strong>Body:</strong> ${car.type}</div>`);
-        if (car.drive) details.push(`<div class="detail"><strong>Drive:</strong> ${car.drive}</div>`);
-        if (car.paint_color) details.push(`<div class="detail"><strong>Color:</strong> ${car.paint_color}</div>`);
-        if (car.state) details.push(`<div class="detail"><strong>Location:</strong> ${car.state.toUpperCase()}</div>`);
+        if (car.odometer) details.push(`<div class="detail"><strong>Mileage:</strong> ${escapeHtml(car.odometer.toLocaleString())} miles</div>`);
+        if (car.transmission) details.push(`<div class="detail"><strong>Transmission:</strong> ${escapeHtml(car.transmission)}</div>`);
+        if (car.fuel) details.push(`<div class="detail"><strong>Fuel:</strong> ${escapeHtml(car.fuel)}</div>`);
+        if (car.type) details.push(`<div class="detail"><strong>Body:</strong> ${escapeHtml(car.type)}</div>`);
+        if (car.drive) details.push(`<div class="detail"><strong>Drive:</strong> ${escapeHtml(car.drive)}</div>`);
+        if (car.paint_color) details.push(`<div class="detail"><strong>Color:</strong> ${escapeHtml(car.paint_color)}</div>`);
+        if (car.state) details.push(`<div class="detail"><strong>Location:</strong> ${escapeHtml(car.state).toUpperCase()}</div>`);
         
         const description = car.description ? 
-            `<div class="description">${car.description.substring(0, 500)}${car.description.length > 500 ? '...' : ''}</div>` : '';
+            `<div class="description">${escapeHtml(car.description.substring(0, 500))}${car.description.length > 500 ? '...' : ''}</div>` : '';
         
-        const imageHtml = `<img src="${imageSrc}" alt="${car.type || 'sedan'}" style="width: 100%; height: 100%; object-fit: cover;">`;
+        const altText = escapeHtml(car.type || 'sedan');
+        const imageHtml = `<img src="${escapeHtml(imageSrc)}" alt="${altText}" style="width: 100%; height: 100%; object-fit: cover;">`;
         
         return `
             <div class="result-card">
@@ -70,5 +80,6 @@ function displayResults(results, elapsed) {
         `;
     }).join('');
     
+    // nosemgrep: insecure-innerhtml, insecure-document-method
     container.innerHTML = header + cards;
 }

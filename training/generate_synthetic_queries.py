@@ -20,6 +20,7 @@ def main():
 
     print(f"Generating {args.num_queries} synthetic queries...")
 
+    # GLM-4.7 is only available in us-east-1
     client = boto3.client('bedrock-runtime', region_name='us-east-1')
     prompt = load_prompt()
 

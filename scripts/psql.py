@@ -17,8 +17,14 @@ import boto3
 
 
 def get_db_credentials():
-    secrets = boto3.client("secretsmanager", region_name="eu-west-2")
-    secret = secrets.get_secret_value(SecretId="car-search/db-credentials")
+    region = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+    secrets = boto3.client("secretsmanager", region_name=region)
+    
+    response = secrets.list_secrets(Filters=[{'Key': 'name', 'Values': ['car-search/db-credentials-']}])
+    if not response['SecretList']:
+        raise Exception('No secret found with prefix car-search/db-credentials-')
+    
+    secret = secrets.get_secret_value(SecretId=response['SecretList'][0]['ARN'])
     return json.loads(secret["SecretString"])
 
 
@@ -43,9 +49,13 @@ def main():
 
     # If SQL file provided, execute it
     if len(sys.argv) > 1:
-        cmd.extend(["-f", sys.argv[1]])
+        sql_file = os.path.realpath(sys.argv[1])
+        if not os.path.isfile(sql_file):
+            print(f"Error: {sys.argv[1]} is not a valid file", file=sys.stderr)
+            sys.exit(1)
+        cmd.extend(["-f", sql_file])
 
-    subprocess.run(cmd, env=env)
+    subprocess.run(cmd, env=env)  # nosemgrep: dangerous-subprocess-use-audit
 
 
 if __name__ == "__main__":

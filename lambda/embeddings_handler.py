@@ -6,7 +6,12 @@ import os
 
 def get_db_connection():
     sm = boto3.client('secretsmanager')
-    secret = sm.get_secret_value(SecretId='car-search/db-credentials')
+    
+    response = sm.list_secrets(Filters=[{'Key': 'name', 'Values': ['car-search/db-credentials-']}])
+    if not response['SecretList']:
+        raise Exception('No secret found with prefix car-search/db-credentials-')
+    
+    secret = sm.get_secret_value(SecretId=response['SecretList'][0]['ARN'])
     creds = json.loads(secret['SecretString'])
     
     return psycopg2.connect(
@@ -56,6 +61,7 @@ def compose_embedding_text(row):
 def lambda_handler(event, context):
     listing_ids = event.get('listing_ids', [])
     print(f"Received request for {len(listing_ids)} listing IDs")
+    print(f"IDs (sorted): {sorted(listing_ids)[:10]}...{sorted(listing_ids)[-10:]}" if len(listing_ids) > 20 else f"IDs: {sorted(listing_ids)}")
     
     if not listing_ids:
         print("ERROR: No listing_ids provided")
@@ -126,14 +132,16 @@ def lambda_handler(event, context):
             """, (listing['id'], text, embedding))
             processed_ids.append(listing['id'])
         
+        conn.commit()
+        
         # Clear successfully processed IDs from queue (if table exists)
         try:
             print(f"Clearing {len(processed_ids)} IDs from embedding_queue...")
             cur.execute("DELETE FROM embedding_queue WHERE listing_id = ANY(%s)", (processed_ids,))
+            conn.commit()
         except psycopg2.Error as e:
             print(f"WARNING: Failed to clear queue (table may not exist): {e}")
         
-        conn.commit()
         cur.close()
         
         print(f"Successfully processed {len(listings)} listings")

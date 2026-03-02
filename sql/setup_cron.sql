@@ -9,37 +9,46 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE OR REPLACE FUNCTION process_embedding_queue()
 RETURNS void AS $$
 DECLARE
-    queue_depth INTEGER;
-    num_batches INTEGER;
+    all_ids BIGINT[];
     batch_ids BIGINT[];
     lambda_arn aws_commons._lambda_function_arn_1;
     i INTEGER;
+    start_idx INTEGER;
+    end_idx INTEGER;
 BEGIN
-    SELECT COUNT(*) INTO queue_depth FROM embedding_queue;
+    -- Select up to 672 IDs
+    SELECT ARRAY_AGG(listing_id ORDER BY queued_at ASC) INTO all_ids
+    FROM (
+        SELECT listing_id, queued_at
+        FROM embedding_queue 
+        ORDER BY queued_at ASC 
+        LIMIT 672
+    ) subq;
     
-    IF queue_depth = 0 THEN
+    IF all_ids IS NULL THEN
         RETURN;
     END IF;
     
-    num_batches := LEAST(CEIL(queue_depth / 96.0)::INTEGER, 10);
     lambda_arn := aws_commons.create_lambda_function_arn('car-search-embeddings', 'eu-west-2');
     
-    FOR i IN 1..num_batches LOOP
-        SELECT ARRAY_AGG(listing_id) INTO batch_ids
-        FROM (
-            SELECT listing_id 
-            FROM embedding_queue 
-            ORDER BY queued_at ASC 
-            LIMIT 96
-        ) subq;
+    -- Invoke Lambda up to 7 times with slices of 96 IDs each
+    FOR i IN 0..6 LOOP
+        start_idx := i * 96 + 1;
+        end_idx := (i + 1) * 96;
         
-        EXIT WHEN batch_ids IS NULL;
+        EXIT WHEN start_idx > array_length(all_ids, 1);
+        
+        batch_ids := all_ids[start_idx:end_idx];
         
         PERFORM aws_lambda.invoke(
             lambda_arn,
             json_build_object('listing_ids', batch_ids)::json,
             'Event'
         );
+        
+        IF i < 6 THEN
+            PERFORM pg_sleep(5);
+        END IF;
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;

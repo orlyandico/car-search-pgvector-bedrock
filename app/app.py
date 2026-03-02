@@ -19,9 +19,14 @@ app = Flask(__name__)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    stream=sys.stdout
+    handlers=[
+        logging.FileHandler('debug.log'),
+        logging.StreamHandler(sys.stdout)
+    ]
 )
 logger = logging.getLogger(__name__)
+debug_logger = logging.getLogger('debug')
+debug_logger.setLevel(logging.DEBUG)
 
 # Training data collection
 TRAINING_DATA_FILE = os.path.join(os.path.dirname(__file__), 'training_data.jsonl')
@@ -189,12 +194,12 @@ def api_search():
 @app.route('/api/hybrid', methods=['POST'])
 def api_chat():
     try:
-        print("=== CHAT REQUEST RECEIVED ===", flush=True)
+        debug_logger.debug("=== CHAT REQUEST RECEIVED ===")
         user_query = request.json.get('query', '')
         if not user_query:
             return jsonify({'error': 'Query required'}), 400
         
-        print(f"Chat query: {user_query}", flush=True)
+        debug_logger.debug(f"Chat query: {user_query}")
         
         bedrock = boto3.client('bedrock-runtime', region_name=os.environ.get('AWS_DEFAULT_REGION', 'eu-west-2'))
         
@@ -202,15 +207,15 @@ def api_chat():
         filters, semantic_query = extract_filters(bedrock, user_query)
         semantic_query = semantic_query.strip() if semantic_query else ''
             
-        print(f"Extracted filters: {filters}", flush=True)
-        print(f"Semantic query: '{semantic_query}'", flush=True)
+        debug_logger.debug(f"Extracted filters: {filters}")
+        debug_logger.debug(f"Semantic query: '{semantic_query}'")
         
         # Log training data
         log_training_data(user_query, filters, semantic_query)
         
         # Generate query embedding using semantic query (or original query if empty)
         embed_text = semantic_query if semantic_query else user_query
-        print(f"Calling Bedrock for embedding with: '{embed_text}'", flush=True)
+        debug_logger.debug(f"Calling Bedrock for embedding with: '{embed_text}'")
         response = bedrock.invoke_model(
             modelId='global.cohere.embed-v4:0',
             contentType='application/json',
@@ -224,10 +229,10 @@ def api_chat():
         )
         
         embedding = json.loads(response['body'].read())['embeddings']['float'][0]
-        print(f"Received embedding with {len(embedding)} dimensions", flush=True)
+        debug_logger.debug(f"Received embedding with {len(embedding)} dimensions")
         
         # Build hybrid query with filters
-        print("Querying database with filters...", flush=True)
+        debug_logger.debug("Querying database with filters...")
         query = """
             SELECT cl.*, 1 - (ce.embedding <=> %s::vector) AS similarity
             FROM car_embeddings ce
@@ -293,14 +298,14 @@ def api_chat():
         
         conn = get_db_connection()
         cur = conn.cursor()
-        print(f"SQL Query: {query}", flush=True)
-        print(f"Executing query with {len(params)} parameters", flush=True)
-        print(f"Non-embedding params: {params[1:-1]}", flush=True)
+        debug_logger.debug(f"SQL Query: {query}")
+        debug_logger.debug(f"Executing query with {len(params)} parameters")
+        debug_logger.debug(f"Non-embedding params: {params[1:-1]}")
         cur.execute(query, params)
         
-        print(f"Query executed, fetching results...", flush=True)
+        debug_logger.debug(f"Query executed, fetching results...")
         rows = cur.fetchall()
-        print(f"Fetched {len(rows)} rows from database", flush=True)
+        debug_logger.debug(f"Fetched {len(rows)} rows from database")
         
         columns = [desc[0] for desc in cur.description]
         results = []
@@ -310,15 +315,13 @@ def api_chat():
         cur.close()
         conn.close()
         
-        print(f"Found {len(results)} results", flush=True)
+        debug_logger.debug(f"Found {len(results)} results")
         
         return jsonify(results)
     
     except Exception as e:
-        print(f"CHAT ERROR: {e}", flush=True)
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': 'Something went wrong'}), 500
+        logger.error(f"Hybrid search error: {e}")
+        return jsonify({'error': 'Search request failed'}), 500
 
 @app.route('/api/semantic', methods=['POST'])
 def api_semantic():
@@ -372,12 +375,12 @@ def api_semantic():
 @app.route('/api/keyword', methods=['POST'])
 def api_keyword():
     try:
-        print("=== KEYWORD REQUEST RECEIVED ===", flush=True)
+        debug_logger.debug("=== KEYWORD REQUEST RECEIVED ===")
         user_query = request.json.get('query', '')
         if not user_query:
             return jsonify({'error': 'Query required'}), 400
         
-        print(f"Keyword query: {user_query}", flush=True)
+        debug_logger.debug(f"Keyword query: {user_query}")
         
         bedrock = boto3.client('bedrock-runtime', region_name=os.environ.get('AWS_DEFAULT_REGION', 'eu-west-2'))
         
@@ -385,14 +388,14 @@ def api_keyword():
         filters, semantic_query = extract_filters(bedrock, user_query)
         semantic_query = semantic_query.strip() if semantic_query else ''
         
-        print(f"Extracted filters: {filters}", flush=True)
-        print(f"Semantic query: '{semantic_query}'", flush=True)
+        debug_logger.debug(f"Extracted filters: {filters}")
+        debug_logger.debug(f"Semantic query: '{semantic_query}'")
         
         # Log training data
         log_training_data(user_query, filters, semantic_query)
         
         # Build query with filters + keyword search
-        print("Building SQL query with filters...", flush=True)
+        debug_logger.debug("Building SQL query with filters...")
         query = "SELECT * FROM car_listings WHERE 1=1"
         params = []
         
@@ -455,17 +458,17 @@ def api_keyword():
         
         query += " LIMIT 10"
         
-        print(f"SQL Query: {query}", flush=True)
-        print(f"Executing query with {len(params)} parameters", flush=True)
-        print(f"Non-keyword params: {params[:-1]}", flush=True)
+        debug_logger.debug(f"SQL Query: {query}")
+        debug_logger.debug(f"Executing query with {len(params)} parameters")
+        debug_logger.debug(f"Non-keyword params: {params[:-1]}")
         
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(query, params)
         
-        print(f"Query executed, fetching results...", flush=True)
+        debug_logger.debug(f"Query executed, fetching results...")
         rows = cur.fetchall()
-        print(f"Fetched {len(rows)} rows from database", flush=True)
+        debug_logger.debug(f"Fetched {len(rows)} rows from database")
         
         columns = [desc[0] for desc in cur.description]
         results = [dict(zip(columns, row)) for row in rows]
@@ -473,16 +476,26 @@ def api_keyword():
         cur.close()
         conn.close()
         
-        print(f"Found {len(results)} results", flush=True)
+        debug_logger.debug(f"Found {len(results)} results")
         
         return jsonify(results)
     
     except Exception as e:
-        print(f"KEYWORD ERROR: {e}", flush=True)
-        import traceback
-        traceback.print_exc()
         logger.error(f"Keyword search error: {e}")
-        return jsonify({'error': 'Something went wrong'}), 500
+        return jsonify({'error': 'Search request failed'}), 500
+
+@app.errorhandler(400)
+def bad_request(e):
+    return jsonify({'error': 'Invalid request'}), 400
+
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({'error': 'Resource not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(e):
+    logger.error(f"Internal error: {e}")
+    return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

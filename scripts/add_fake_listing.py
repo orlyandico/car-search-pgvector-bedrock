@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import boto3
 import json
+import os
 import psycopg2
 from datetime import datetime
 
 def get_db_connection():
-    secrets = boto3.client('secretsmanager', region_name='eu-west-2')
+    region = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
+    secrets = boto3.client('secretsmanager', region_name=region)
     secret = secrets.get_secret_value(SecretId='car-search/db-credentials')
     creds = json.loads(secret['SecretString'])
     
@@ -19,6 +21,7 @@ def get_db_connection():
     )
 
 def generate_fake_listing():
+    # GLM-4.7 is only available in us-east-1
     bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
     
     prompt = """Generate a realistic used car listing as JSON. Choose a RANDOM manufacturer from this list:

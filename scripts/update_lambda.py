@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import boto3
+import os
 import zipfile
 import io
-import os
 import subprocess
 import tempfile
 import shutil
@@ -12,9 +12,13 @@ def package_lambda():
     lambda_file = os.path.join(script_dir, '..', 'lambda', 'embeddings_handler.py')
     
     with tempfile.TemporaryDirectory() as tmpdir:
-        print("Installing psycopg2-binary...")
+        print("Installing psycopg2-binary for Lambda arm64 (Linux aarch64)...")
         subprocess.run([
-            'pip3', 'install', 'psycopg2-binary', '-t', tmpdir, '--quiet'
+            'pip3', 'install', 'psycopg2-binary',
+            '--platform', 'manylinux2014_aarch64',
+            '--only-binary=:all:',
+            '--python-version', '3.12',
+            '-t', tmpdir, '--quiet'
         ], check=True)
         
         # Copy Lambda function as lambda_function.py
@@ -39,7 +43,8 @@ def main():
     zip_content = package_lambda()
     
     print("Updating Lambda function code...")
-    lambda_client = boto3.client('lambda', region_name='eu-west-2')
+    region = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
+    lambda_client = boto3.client('lambda', region_name=region)
     
     # Wait for function to be ready
     waiter = lambda_client.get_waiter('function_active')

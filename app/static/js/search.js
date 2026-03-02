@@ -1,3 +1,10 @@
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+}
+
 // Update range displays
 document.getElementById('minYear').addEventListener('input', updateYearRange);
 document.getElementById('maxYear').addEventListener('input', updateYearRange);
@@ -71,16 +78,17 @@ function displayResults(results, elapsed) {
     
     if (!results || results.length === 0) {
         header.style.display = 'none';
-        container.innerHTML = '<div class="empty-state">No cars found matching your criteria</div>';
+        container.replaceChildren(Object.assign(document.createElement('div'), {className: 'empty-state', textContent: 'No cars found matching your criteria'}));
         return;
     }
     
     header.style.display = 'block';
     count.textContent = `${results.length} car${results.length !== 1 ? 's' : ''} found in ${elapsed}ms`;
     
+    // nosemgrep: insecure-innerhtml, insecure-document-method
     container.innerHTML = results.map(car => {
-        const title = [car.year, car.manufacturer, car.model].filter(Boolean).join(' ');
-        const price = car.price ? `$${car.price.toLocaleString()}` : 'Price not listed';
+        const title = escapeHtml([car.year, car.manufacturer, car.model].filter(Boolean).join(' '));
+        const price = car.price ? `$${escapeHtml(car.price.toLocaleString())}` : 'Price not listed';
         
         // Map type to image
         const imageMap = {
@@ -93,35 +101,37 @@ function displayResults(results, elapsed) {
             'van': 'img_van.jpeg',
             'convertible': 'img_convertible.jpeg'
         };
-        const imageSrc = car.type && imageMap[car.type.toLowerCase()] 
-            ? `/static/images/${imageMap[car.type.toLowerCase()]}` 
+        const typeKey = car.type ? car.type.toLowerCase() : '';
+        const imageSrc = imageMap[typeKey] 
+            ? `/static/images/${imageMap[typeKey]}` 
             : '/static/images/img_sedan.jpeg';  // Default to sedan
         
         const badges = [];
         if (car.condition) {
             const conditionClass = car.condition === 'excellent' || car.condition === 'like new' ? 'condition-excellent' : 
                                    car.condition === 'good' ? 'condition-good' : '';
-            badges.push(`<span class="badge ${conditionClass}">${car.condition.toUpperCase()}</span>`);
+            badges.push(`<span class="badge ${escapeHtml(conditionClass)}">${escapeHtml(car.condition).toUpperCase()}</span>`);
         }
         if (car.fuel === 'electric' || car.fuel === 'hybrid') {
-            badges.push(`<span class="badge">${car.fuel.toUpperCase()}</span>`);
+            badges.push(`<span class="badge">${escapeHtml(car.fuel).toUpperCase()}</span>`);
         }
         
         const details = [];
-        if (car.odometer) details.push(`<div class="detail"><strong>Mileage:</strong> ${car.odometer.toLocaleString()} miles</div>`);
-        if (car.transmission) details.push(`<div class="detail"><strong>Transmission:</strong> ${car.transmission}</div>`);
-        if (car.fuel) details.push(`<div class="detail"><strong>Fuel:</strong> ${car.fuel}</div>`);
-        if (car.type) details.push(`<div class="detail"><strong>Body:</strong> ${car.type}</div>`);
-        if (car.drive) details.push(`<div class="detail"><strong>Drive:</strong> ${car.drive}</div>`);
-        if (car.cylinders) details.push(`<div class="detail"><strong>Engine:</strong> ${car.cylinders}</div>`);
-        if (car.paint_color) details.push(`<div class="detail"><strong>Color:</strong> ${car.paint_color}</div>`);
-        if (car.state) details.push(`<div class="detail"><strong>Location:</strong> ${car.state.toUpperCase()}</div>`);
+        if (car.odometer) details.push(`<div class="detail"><strong>Mileage:</strong> ${escapeHtml(car.odometer.toLocaleString())} miles</div>`);
+        if (car.transmission) details.push(`<div class="detail"><strong>Transmission:</strong> ${escapeHtml(car.transmission)}</div>`);
+        if (car.fuel) details.push(`<div class="detail"><strong>Fuel:</strong> ${escapeHtml(car.fuel)}</div>`);
+        if (car.type) details.push(`<div class="detail"><strong>Body:</strong> ${escapeHtml(car.type)}</div>`);
+        if (car.drive) details.push(`<div class="detail"><strong>Drive:</strong> ${escapeHtml(car.drive)}</div>`);
+        if (car.cylinders) details.push(`<div class="detail"><strong>Engine:</strong> ${escapeHtml(car.cylinders)}</div>`);
+        if (car.paint_color) details.push(`<div class="detail"><strong>Color:</strong> ${escapeHtml(car.paint_color)}</div>`);
+        if (car.state) details.push(`<div class="detail"><strong>Location:</strong> ${escapeHtml(car.state).toUpperCase()}</div>`);
         
         const description = car.description ? 
-            `<div class="description">${car.description.substring(0, 500)}${car.description.length > 500 ? '...' : ''}</div>` : '';
+            `<div class="description">${escapeHtml(car.description.substring(0, 500))}${car.description.length > 500 ? '...' : ''}</div>` : '';
         
+        const altText = escapeHtml(car.type || 'sedan');
         const imageHtml = imageSrc 
-            ? `<img src="${imageSrc}" alt="${car.type || 'sedan'}" style="width: 100%; height: 100%; object-fit: cover;">` 
+            ? `<img src="${escapeHtml(imageSrc)}" alt="${altText}" style="width: 100%; height: 100%; object-fit: cover;">` 
             : 'No Image Available';
         
         return `

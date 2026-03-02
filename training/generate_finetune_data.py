@@ -36,6 +36,7 @@ def main():
     if not os.path.exists(args.input):
         raise FileNotFoundError(f"Input file not found: {args.input}")
 
+    # GLM-4.7 is only available in us-east-1
     client = boto3.client('bedrock-runtime', region_name='us-east-1')
     template = load_prompt_template()
 

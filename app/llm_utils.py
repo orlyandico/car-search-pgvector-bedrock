@@ -28,20 +28,39 @@ def extract_filters(bedrock_client, user_query, model_id=None):
         model_id = os.environ.get('FILTER_MODEL_ID', DEFAULT_MODEL_ID)
     
     import boto3
+    # GLM-4.7 is only available in us-east-1
     llm_client = boto3.client('bedrock-runtime', region_name='us-east-1')
     
     print(f"Using model: {model_id}", flush=True)
     
+    # Truncate query to 250 characters
+    user_query = user_query[:250]
+    
     filter_prompt = FILTER_PROMPT_TEMPLATE.format(query=user_query)
     
-    response = llm_client.converse(
-        modelId=model_id,
-        messages=[{
+    # Build converse parameters
+    converse_params = {
+        'modelId': model_id,
+        'messages': [{
             "role": "user",
             "content": [{"text": filter_prompt}]
         }],
-        inferenceConfig={'maxTokens': 200, 'temperature': 0.1}
-    )
+        'inferenceConfig': {'maxTokens': 200, 'temperature': 0.1}
+    }
+    
+    # Add guardrail only if both ID and version are present
+    guardrail_id = os.environ.get('BEDROCK_GUARDRAIL_ID')
+    guardrail_version = os.environ.get('BEDROCK_GUARDRAIL_VERSION')
+    if guardrail_id and guardrail_version:
+        converse_params['guardrailConfig'] = {
+            'guardrailIdentifier': guardrail_id,
+            'guardrailVersion': guardrail_version
+        }
+        print(f"Using guardrail: {guardrail_id} v{guardrail_version}", flush=True)
+    else:
+        print("No guardrail configured", flush=True)
+    
+    response = llm_client.converse(**converse_params)
     filters_text = response["output"]["message"]["content"][0]["text"].strip()
     
     print(f"Raw LLM output: {filters_text}", flush=True)

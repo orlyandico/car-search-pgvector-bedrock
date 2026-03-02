@@ -1,3 +1,28 @@
+output "cloudfront_url" {
+  description = "CloudFront distribution URL (HTTPS with valid AWS certificate)"
+  value       = "https://${aws_cloudfront_distribution.main.domain_name}"
+}
+
+output "alb_dns_name" {
+  description = "DNS name of the Application Load Balancer"
+  value       = aws_lb.main.dns_name
+}
+
+output "alb_url" {
+  description = "HTTP URL for the ALB (use CloudFront URL instead)"
+  value       = "http://${aws_lb.main.dns_name}"
+}
+
+output "bedrock_guardrail_id" {
+  description = "Bedrock Guardrail ID for prompt injection protection"
+  value       = aws_bedrock_guardrail.main.guardrail_id
+}
+
+output "bedrock_guardrail_version" {
+  description = "Bedrock Guardrail version"
+  value       = aws_bedrock_guardrail_version.main.version
+}
+
 output "aurora_endpoint" {
   description = "Aurora cluster endpoint"
   value       = aws_rds_cluster.main.endpoint
@@ -45,5 +70,5 @@ output "loader_instance_ip" {
 
 output "loader_ssh_command" {
   description = "SSH command to connect to loader instance"
-  value       = "ssh -i tofu/car-search-loader.pem ec2-user@${aws_instance.loader.public_ip}"
+  value       = "ssh ec2-user@${aws_instance.loader.public_ip}"
 }

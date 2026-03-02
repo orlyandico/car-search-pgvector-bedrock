@@ -7,7 +7,12 @@ from datetime import datetime
 
 def get_db_connection():
     sm = boto3.client('secretsmanager')
-    secret = sm.get_secret_value(SecretId='car-search/db-credentials')
+    
+    response = sm.list_secrets(Filters=[{'Key': 'name', 'Values': ['car-search/db-credentials-']}])
+    if not response['SecretList']:
+        raise Exception('No secret found with prefix car-search/db-credentials-')
+    
+    secret = sm.get_secret_value(SecretId=response['SecretList'][0]['ARN'])
     creds = json.loads(secret['SecretString'])
     
     return psycopg2.connect(
